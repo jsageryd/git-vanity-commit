@@ -65,7 +65,7 @@ func fetchCommit(ref string) []byte {
 }
 
 func find(hashPrefix, header string, commit []byte) []byte {
-	ints := make(chan int, 2048)
+	intSlices := make(chan []int, 2048)
 	done := make(chan struct{})
 	found := make(chan []byte)
 
@@ -76,23 +76,25 @@ func find(hashPrefix, header string, commit []byte) []byte {
 		dst := make([]byte, sha1.Size*2)
 		scratch := make([]byte, 0, sha1.Size)
 
-		for n := range ints {
-			fmt.Fprintf(h, "commit %d\x00", len(commit)+len(header)+1+len(strconv.Itoa(n))+1)
-			h.Write(head)
-			fmt.Fprintf(h, "\n%s %d", header, n)
-			h.Write(tail)
-			candidate := h.Sum(scratch[:0])
-			hex.Encode(dst, candidate)
-			if bytes.Equal(dst[:len(hashPrefix)], []byte(hashPrefix)) {
-				buf := new(bytes.Buffer)
-				buf.Write(head)
-				fmt.Fprintf(buf, "\n%s %d", header, n)
-				buf.Write(tail)
-				found <- buf.Bytes()
-				close(done)
-				return
+		for intSlice := range intSlices {
+			for _, n := range intSlice {
+				fmt.Fprintf(h, "commit %d\x00", len(commit)+len(header)+1+len(strconv.Itoa(n))+1)
+				h.Write(head)
+				fmt.Fprintf(h, "\n%s %d", header, n)
+				h.Write(tail)
+				candidate := h.Sum(scratch[:0])
+				hex.Encode(dst, candidate)
+				if bytes.Equal(dst[:len(hashPrefix)], []byte(hashPrefix)) {
+					buf := new(bytes.Buffer)
+					buf.Write(head)
+					fmt.Fprintf(buf, "\n%s %d", header, n)
+					buf.Write(tail)
+					found <- buf.Bytes()
+					close(done)
+					return
+				}
+				h.Reset()
 			}
-			h.Reset()
 		}
 	}
 
@@ -100,14 +102,23 @@ func find(hashPrefix, header string, commit []byte) []byte {
 		go work()
 	}
 
+	const intSliceSize = 100
+
 	go func() {
+		intSlice := make([]int, 0, intSliceSize)
 		for n := 0; ; n++ {
-			select {
-			case <-done:
-				close(ints)
-				return
-			default:
-				ints <- n
+			intSlice = append(intSlice, n)
+
+			if n%intSliceSize == 0 {
+				select {
+				case <-done:
+					close(intSlices)
+					return
+				default:
+					intSlices <- intSlice
+				}
+
+				intSlice = make([]int, 0, intSliceSize)
 			}
 		}
 	}()
