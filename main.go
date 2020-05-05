@@ -65,7 +65,7 @@ func fetchCommit(ref string) []byte {
 }
 
 func find(hashPrefix, header string, commit []byte) []byte {
-	ints := make(chan int, 64)
+	ints := make(chan int, 2048)
 	done := make(chan struct{})
 	found := make(chan []byte)
 
