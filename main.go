@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"time"
 )
@@ -64,27 +65,52 @@ func fetchCommit(ref string) []byte {
 }
 
 func find(hashPrefix, header string, commit []byte) []byte {
-	h := sha1.New()
-	head, tail := headTail(commit)
+	ints := make(chan int, 64)
+	done := make(chan struct{})
+	found := make(chan []byte)
 
-	dst := make([]byte, sha1.Size*2)
+	work := func() {
+		h := sha1.New()
+		head, tail := headTail(commit)
 
-	for n := 0; ; n++ {
-		fmt.Fprintf(h, "commit %d\x00", len(commit)+len(header)+1+len(strconv.Itoa(n))+1)
-		h.Write(head)
-		fmt.Fprintf(h, "\n%s %d", header, n)
-		h.Write(tail)
-		candidate := h.Sum(nil)
-		hex.Encode(dst, candidate)
-		if bytes.Equal(dst[:len(hashPrefix)], []byte(hashPrefix)) {
-			buf := new(bytes.Buffer)
-			buf.Write(head)
-			fmt.Fprintf(buf, "\n%s %d", header, n)
-			buf.Write(tail)
-			return buf.Bytes()
+		dst := make([]byte, sha1.Size*2)
+
+		for n := range ints {
+			fmt.Fprintf(h, "commit %d\x00", len(commit)+len(header)+1+len(strconv.Itoa(n))+1)
+			h.Write(head)
+			fmt.Fprintf(h, "\n%s %d", header, n)
+			h.Write(tail)
+			candidate := h.Sum(nil)
+			hex.Encode(dst, candidate)
+			if bytes.Equal(dst[:len(hashPrefix)], []byte(hashPrefix)) {
+				close(done)
+				buf := new(bytes.Buffer)
+				buf.Write(head)
+				fmt.Fprintf(buf, "\n%s %d", header, n)
+				buf.Write(tail)
+				found <- buf.Bytes()
+				return
+			}
+			h.Reset()
 		}
-		h.Reset()
 	}
+
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go work()
+	}
+
+loop:
+	for n := 0; ; n++ {
+		select {
+		case <-done:
+			close(ints)
+			break loop
+		default:
+			ints <- n
+		}
+	}
+
+	return <-found
 }
 
 func headTail(commit []byte) (head, tail []byte) {
