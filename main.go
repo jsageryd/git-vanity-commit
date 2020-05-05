@@ -84,12 +84,12 @@ func find(hashPrefix, header string, commit []byte) []byte {
 			candidate := h.Sum(scratch[:0])
 			hex.Encode(dst, candidate)
 			if bytes.Equal(dst[:len(hashPrefix)], []byte(hashPrefix)) {
-				close(done)
 				buf := new(bytes.Buffer)
 				buf.Write(head)
 				fmt.Fprintf(buf, "\n%s %d", header, n)
 				buf.Write(tail)
 				found <- buf.Bytes()
+				close(done)
 				return
 			}
 			h.Reset()
@@ -100,16 +100,17 @@ func find(hashPrefix, header string, commit []byte) []byte {
 		go work()
 	}
 
-loop:
-	for n := 0; ; n++ {
-		select {
-		case <-done:
-			close(ints)
-			break loop
-		default:
-			ints <- n
+	go func() {
+		for n := 0; ; n++ {
+			select {
+			case <-done:
+				close(ints)
+				return
+			default:
+				ints <- n
+			}
 		}
-	}
+	}()
 
 	return <-found
 }
