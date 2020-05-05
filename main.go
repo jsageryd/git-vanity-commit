@@ -74,13 +74,14 @@ func find(hashPrefix, header string, commit []byte) []byte {
 		head, tail := headTail(commit)
 
 		dst := make([]byte, sha1.Size*2)
+		scratch := make([]byte, 0, sha1.Size)
 
 		for n := range ints {
 			fmt.Fprintf(h, "commit %d\x00", len(commit)+len(header)+1+len(strconv.Itoa(n))+1)
 			h.Write(head)
 			fmt.Fprintf(h, "\n%s %d", header, n)
 			h.Write(tail)
-			candidate := h.Sum(nil)
+			candidate := h.Sum(scratch[:0])
 			hex.Encode(dst, candidate)
 			if bytes.Equal(dst[:len(hashPrefix)], []byte(hashPrefix)) {
 				close(done)
