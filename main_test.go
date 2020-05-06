@@ -46,6 +46,59 @@ Message
 	}
 }
 
+func TestTrimHeader(t *testing.T) {
+	for n, tc := range []struct {
+		head   []byte
+		header string
+		want   []byte
+	}{
+		{
+			head:   []byte{},
+			header: "f00",
+			want:   []byte{},
+		},
+		{
+			head: []byte(`tree 0000000000000000000000000000000000000000
+author Author Name <author@example.com> 1577872800 +0000
+committer Committer Name <committer@example.com> 1577876400 +0100
+f00 123`),
+			header: "f00",
+			want: []byte(`tree 0000000000000000000000000000000000000000
+author Author Name <author@example.com> 1577872800 +0000
+committer Committer Name <committer@example.com> 1577876400 +0100`),
+		},
+		{
+			head: []byte(`tree 0000000000000000000000000000000000000000
+author Author Name <author@example.com> 1577872800 +0000
+committer Committer Name <committer@example.com> 1577876400 +0100
+f00 123`),
+			header: "unknown",
+			want: []byte(`tree 0000000000000000000000000000000000000000
+author Author Name <author@example.com> 1577872800 +0000
+committer Committer Name <committer@example.com> 1577876400 +0100
+f00 123`),
+		},
+		{
+			head: []byte(`tree 0000000000000000000000000000000000000000
+author Author Name <author@example.com> 1577872800 +0000
+f00 123
+committer Committer Name <committer@example.com> 1577876400 +0100`),
+			header: "f00",
+			want: []byte(`tree 0000000000000000000000000000000000000000
+author Author Name <author@example.com> 1577872800 +0000
+f00 123
+committer Committer Name <committer@example.com> 1577876400 +0100`),
+		},
+	} {
+
+		got := trimHeader(tc.head, tc.header)
+
+		if !bytes.Equal(got, tc.want) {
+			t.Errorf("[%d] got:\n%s\n\nwant:\n%s", n, got, tc.want)
+		}
+	}
+}
+
 func BenchmarkFind(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		find("c0ffee", "c0ffee", []byte(commit))

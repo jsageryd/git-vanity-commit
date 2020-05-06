@@ -72,13 +72,14 @@ func find(hashPrefix, header string, commit []byte) []byte {
 	work := func() {
 		h := sha1.New()
 		head, tail := headTail(commit)
+		head = trimHeader(head, header)
 
 		dst := make([]byte, sha1.Size*2)
 		scratch := make([]byte, 0, sha1.Size)
 
 		for intSlice := range intSlices {
 			for _, n := range intSlice {
-				fmt.Fprintf(h, "commit %d\x00", len(commit)+len(header)+1+len(strconv.Itoa(n))+1)
+				fmt.Fprintf(h, "commit %d\x00", len(head)+len(tail)+len(header)+1+len(strconv.Itoa(n))+1)
 				h.Write(head)
 				fmt.Fprintf(h, "\n%s %d", header, n)
 				h.Write(tail)
@@ -132,6 +133,19 @@ func headTail(commit []byte) (head, tail []byte) {
 		log.Fatal("cannot parse commit")
 	}
 	return commit[:idx], commit[idx:]
+}
+
+func trimHeader(head []byte, header string) []byte {
+	idx := bytes.LastIndex(head, []byte("\n"))
+	if idx == -1 {
+		return head
+	}
+
+	if bytes.HasPrefix(head[idx+1:], []byte(header)) {
+		return head[:idx]
+	}
+
+	return head
 }
 
 func writeCommit(commit []byte) (hash string) {
