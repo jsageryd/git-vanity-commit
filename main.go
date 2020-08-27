@@ -121,7 +121,10 @@ func find(hashPrefix, header string, commit []byte) []byte {
 		}
 	}
 
-	for i := 0; i < runtime.NumCPU(); i++ {
+	workers := runtime.NumCPU()
+	log.Printf("Using %d concurrent workers", workers)
+
+	for i := 0; i < workers; i++ {
 		go work()
 	}
 
