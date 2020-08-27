@@ -21,6 +21,7 @@ func main() {
 
 	commit := flag.String("commit", "HEAD", "Starting point")
 	prefix := flag.String("prefix", "", "Desired hash prefix (mandatory)")
+	key := flag.String("key", "", "Key used in the commit header (defaults to the prefix)")
 	reset := flag.Bool("reset", false, "If set, reset to the new commit")
 
 	flag.Parse()
@@ -40,13 +41,25 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *key == "" {
+		*key = *prefix
+	}
+
+	invalidKey := regexp.MustCompile("^(commit|tree|parent|author|committer|encoding|[^a-zA-Z0-9])$").MatchString
+	if invalidKey(*key) {
+		fmt.Fprintln(os.Stderr, "invalid key")
+		fmt.Fprintln(os.Stderr)
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	log.Printf("Using commit at %s (%s)", *commit, revParseShort(*commit))
 	log.Printf("Finding hash prefixed %q", *prefix)
 
 	start := time.Now()
 
 	headCommit := fetchCommit(*commit)
-	newCommit := find(*prefix, *prefix, headCommit)
+	newCommit := find(*prefix, *key, headCommit)
 	hash := writeCommit(newCommit)
 
 	log.Printf("Found %s (%s)", hash, time.Since(start).Round(time.Millisecond))
