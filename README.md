@@ -4,7 +4,7 @@
 
 ## Installation
 ```
-go get -u github.com/jsageryd/git-vanity-commit
+go install github.com/jsageryd/git-vanity-commit@latest
 ```
 
 ## Usage example
