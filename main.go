@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-var invalidKey = regexp.MustCompile("^(commit|tree|parent|author|committer|encoding|[^a-zA-Z0-9])$").MatchString
+var invalidKey = regexp.MustCompile(`^(commit|tree|parent|author|committer|encoding)\b|[^a-zA-Z0-9]`).MatchString
 var validPrefix = regexp.MustCompile("^[0-9a-f]{1,40}$").MatchString
 
 func main() {

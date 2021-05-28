@@ -16,6 +16,8 @@ func TestInvalidKey(t *testing.T) {
 		{"author", true},
 		{"committer", true},
 		{"encoding", true},
+		{"commit ", true},
+		{"non-alphanumeric", true},
 		{"x", false},
 		{"f00", false},
 	} {
