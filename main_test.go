@@ -5,6 +5,44 @@ import (
 	"testing"
 )
 
+func TestInvalidKey(t *testing.T) {
+	for n, tc := range []struct {
+		key     string
+		invalid bool
+	}{
+		{"commit", true},
+		{"tree", true},
+		{"parent", true},
+		{"author", true},
+		{"committer", true},
+		{"encoding", true},
+		{"x", false},
+		{"f00", false},
+	} {
+		if got, want := invalidKey(tc.key), tc.invalid; got != want {
+			t.Errorf("[%d] invalidKey(%q) = %t, want %t", n, tc.key, got, want)
+		}
+	}
+}
+
+func TestValidPrefix(t *testing.T) {
+	for n, tc := range []struct {
+		prefix string
+		valid  bool
+	}{
+		{"", false},
+		{"x", false},
+		{"0", true},
+		{"f00", true},
+		{"0000000000000000000000000000000000000000", true},   // 40 chars
+		{"00000000000000000000000000000000000000000", false}, // 41 chars
+	} {
+		if got, want := validPrefix(tc.prefix), tc.valid; got != want {
+			t.Errorf("[%d] validPrefix(%q) = %t, want %t", n, tc.prefix, got, want)
+		}
+	}
+}
+
 const commit = `tree 0000000000000000000000000000000000000000
 author Author Name <author@example.com> 1577872800 +0000
 committer Committer Name <committer@example.com> 1577876400 +0100

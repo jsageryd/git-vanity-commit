@@ -15,6 +15,9 @@ import (
 	"time"
 )
 
+var invalidKey = regexp.MustCompile("^(commit|tree|parent|author|committer|encoding|[^a-zA-Z0-9])$").MatchString
+var validPrefix = regexp.MustCompile("^[0-9a-f]{1,40}$").MatchString
+
 func main() {
 	log.SetFlags(log.Ltime | log.Lmsgprefix)
 	log.SetPrefix("| ")
@@ -33,7 +36,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	validPrefix := regexp.MustCompile("^[0-9a-f]{1,40}$").MatchString
 	if !validPrefix(*prefix) {
 		fmt.Fprintln(os.Stderr, "invalid prefix (must be lowercase hex)")
 		fmt.Fprintln(os.Stderr)
@@ -45,7 +47,6 @@ func main() {
 		*key = *prefix
 	}
 
-	invalidKey := regexp.MustCompile("^(commit|tree|parent|author|committer|encoding|[^a-zA-Z0-9])$").MatchString
 	if invalidKey(*key) {
 		fmt.Fprintln(os.Stderr, "invalid key")
 		fmt.Fprintln(os.Stderr)
