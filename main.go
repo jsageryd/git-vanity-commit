@@ -33,7 +33,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	validPrefix := regexp.MustCompile("^[0-9a-f]{0,40}$").MatchString
+	validPrefix := regexp.MustCompile("^[0-9a-f]{1,40}$").MatchString
 	if !validPrefix(*prefix) {
 		fmt.Fprintln(os.Stderr, "invalid prefix (must be lowercase hex)")
 		fmt.Fprintln(os.Stderr)
