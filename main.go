@@ -102,16 +102,18 @@ func find(hashPrefix, header string, commit []byte) []byte {
 
 		for intSlice := range intSlices {
 			for _, n := range intSlice {
-				h.Write([]byte("commit " + strconv.Itoa(len(head)+len(tail)+len(header)+1+len(strconv.Itoa(n))+1) + "\x00"))
+				nStr := strconv.Itoa(n)
+				commitSize := len(head) + len(tail) + len(header) + 1 + len(nStr) + 1
+				h.Write([]byte("commit " + strconv.Itoa(commitSize) + "\x00"))
 				h.Write(head)
-				h.Write([]byte("\n" + header + " " + strconv.Itoa(n)))
+				h.Write([]byte("\n" + header + " " + nStr))
 				h.Write(tail)
 				candidate := h.Sum(scratch[:0])
 				hex.Encode(dst, candidate)
 				if bytes.Equal(dst[:len(hashPrefix)], []byte(hashPrefix)) {
 					buf := new(bytes.Buffer)
 					buf.Write(head)
-					buf.Write([]byte("\n" + header + " " + strconv.Itoa(n)))
+					buf.Write([]byte("\n" + header + " " + nStr))
 					buf.Write(tail)
 					found <- buf.Bytes()
 					close(done)
