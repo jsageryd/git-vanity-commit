@@ -2,8 +2,14 @@ package main
 
 import (
 	"bytes"
+	"io"
+	"log"
 	"testing"
 )
+
+func init() {
+	log.SetOutput(io.Discard)
+}
 
 func TestInvalidKey(t *testing.T) {
 	for n, tc := range []struct {
