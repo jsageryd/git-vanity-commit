@@ -77,12 +77,12 @@ committer Committer Name <committer@example.com> 1577876400 +0100`)
 }
 
 func TestFind(t *testing.T) {
-	found := find("f00", "foo", []byte(commit))
+	found := find("0", "foo", []byte(commit))
 
 	wantFound := []byte(`tree 0000000000000000000000000000000000000000
 author Author Name <author@example.com> 1577872800 +0000
 committer Committer Name <committer@example.com> 1577876400 +0100
-foo 6113
+foo 16
 
 Message
 `)

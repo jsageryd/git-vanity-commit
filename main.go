@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -90,9 +91,19 @@ func fetchCommit(ref string) []byte {
 func find(hashPrefix, header string, commit []byte) []byte {
 	intSlices := make(chan []int, 2048)
 	done := make(chan struct{})
-	found := make(chan []byte)
+
+	type res struct {
+		n int
+		b []byte
+	}
+
+	found := make(chan res)
+
+	var wg sync.WaitGroup
 
 	work := func() {
+		defer wg.Done()
+
 		h := sha1.New()
 		head, tail := headTail(commit)
 		head = trimHeader(head, header)
@@ -115,8 +126,7 @@ func find(hashPrefix, header string, commit []byte) []byte {
 					buf.Write(head)
 					buf.Write([]byte("\n" + header + " " + nStr))
 					buf.Write(tail)
-					found <- buf.Bytes()
-					close(done)
+					found <- res{n, buf.Bytes()}
 					return
 				}
 				h.Reset()
@@ -130,11 +140,18 @@ func find(hashPrefix, header string, commit []byte) []byte {
 		workers = numCPU
 	}
 
+	wg.Add(workers)
+
 	log.Printf("Using %d concurrent workers", workers)
 
 	for i := 0; i < workers; i++ {
 		go work()
 	}
+
+	go func() {
+		wg.Wait()
+		close(found)
+	}()
 
 	const intSliceSize = 100
 
@@ -157,7 +174,17 @@ func find(hashPrefix, header string, commit []byte) []byte {
 		}
 	}()
 
-	return <-found
+	minRes := <-found
+
+	close(done)
+
+	for r := range found {
+		if r.n < minRes.n {
+			minRes = r
+		}
+	}
+
+	return minRes.b
 }
 
 func headTail(commit []byte) (head, tail []byte) {
