@@ -89,7 +89,6 @@ func fetchCommit(ref string) []byte {
 }
 
 func find(hashPrefix, header string, commit []byte) []byte {
-	intSlices := make(chan []int, 2048)
 	done := make(chan struct{})
 
 	type res struct {
@@ -99,9 +98,11 @@ func find(hashPrefix, header string, commit []byte) []byte {
 
 	found := make(chan res)
 
+	var firstN int
+
 	var wg sync.WaitGroup
 
-	work := func() {
+	work := func(offset, stepSize int) {
 		defer wg.Done()
 
 		h := sha1.New()
@@ -111,25 +112,31 @@ func find(hashPrefix, header string, commit []byte) []byte {
 		dst := make([]byte, sha1.Size*2)
 		scratch := make([]byte, 0, sha1.Size)
 
-		for intSlice := range intSlices {
-			for _, n := range intSlice {
-				nStr := strconv.Itoa(n)
-				commitSize := len(head) + len(tail) + len(header) + 1 + len(nStr) + 1
-				h.Write([]byte("commit " + strconv.Itoa(commitSize) + "\x00"))
-				h.Write(head)
-				h.Write([]byte("\n" + header + " " + nStr))
-				h.Write(tail)
-				candidate := h.Sum(scratch[:0])
-				hex.Encode(dst, candidate)
-				if bytes.Equal(dst[:len(hashPrefix)], []byte(hashPrefix)) {
-					buf := new(bytes.Buffer)
-					buf.Write(head)
-					buf.Write([]byte("\n" + header + " " + nStr))
-					buf.Write(tail)
-					found <- res{n, buf.Bytes()}
+		for n := offset; ; n += stepSize {
+			nStr := strconv.Itoa(n)
+			commitSize := len(head) + len(tail) + len(header) + 1 + len(nStr) + 1
+			h.Write([]byte("commit " + strconv.Itoa(commitSize) + "\x00"))
+			h.Write(head)
+			h.Write([]byte("\n" + header + " " + nStr))
+			h.Write(tail)
+			candidate := h.Sum(scratch[:0])
+			hex.Encode(dst, candidate)
+			if bytes.Equal(dst[:len(hashPrefix)], []byte(hashPrefix)) {
+				buf := new(bytes.Buffer)
+				buf.Write(head)
+				buf.Write([]byte("\n" + header + " " + nStr))
+				buf.Write(tail)
+				found <- res{n, buf.Bytes()}
+				return
+			}
+			h.Reset()
+
+			select {
+			case <-done:
+				if n > firstN {
 					return
 				}
-				h.Reset()
+			default:
 			}
 		}
 	}
@@ -145,7 +152,7 @@ func find(hashPrefix, header string, commit []byte) []byte {
 	log.Printf("Using %d concurrent workers", workers)
 
 	for i := 0; i < workers; i++ {
-		go work()
+		go work(i, workers)
 	}
 
 	go func() {
@@ -153,28 +160,8 @@ func find(hashPrefix, header string, commit []byte) []byte {
 		close(found)
 	}()
 
-	const intSliceSize = 100
-
-	go func() {
-		intSlice := make([]int, 0, intSliceSize)
-		for n := 0; ; n++ {
-			intSlice = append(intSlice, n)
-
-			if n%intSliceSize == 0 {
-				select {
-				case <-done:
-					close(intSlices)
-					return
-				default:
-					intSlices <- intSlice
-				}
-
-				intSlice = make([]int, 0, intSliceSize)
-			}
-		}
-	}()
-
 	minRes := <-found
+	firstN = minRes.n
 
 	close(done)
 
