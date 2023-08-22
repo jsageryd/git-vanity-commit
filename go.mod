@@ -1,3 +1,3 @@
 module github.com/jsageryd/git-vanity-commit
 
-go 1.20
+go 1.21.0
