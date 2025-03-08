@@ -61,10 +61,16 @@ func main() {
 	start := time.Now()
 
 	headCommit := fetchCommit(*commit)
-	iteration, newCommit := find(*prefix, *key, headCommit)
-	hash := writeCommit(newCommit)
+	hash, iteration, newCommit := find(*prefix, *key, headCommit)
 
 	log.Printf("Found %s (iteration %d, %s)", hash, iteration, time.Since(start).Round(time.Millisecond))
+
+	writtenHash := writeCommit(newCommit)
+
+	if hash != writtenHash {
+		fmt.Printf("hash mismatch: git-vanity-commit %q vs. hash-object output %q\n", hash, writtenHash)
+		os.Exit(1)
+	}
 
 	if *reset {
 		resetTo(hash)
@@ -88,12 +94,13 @@ func fetchCommit(ref string) []byte {
 	return out
 }
 
-func find(hashPrefix, header string, commit []byte) (iteration int, newCommit []byte) {
+func find(hashPrefix, header string, commit []byte) (hash string, iteration int, newCommit []byte) {
 	done := make(chan struct{})
 
 	type res struct {
-		n int
-		b []byte
+		hash string
+		n    int
+		b    []byte
 	}
 
 	found := make(chan res)
@@ -126,7 +133,7 @@ func find(hashPrefix, header string, commit []byte) (iteration int, newCommit []
 				buf.Write(head)
 				buf.Write([]byte("\n" + header + " " + nStr))
 				buf.Write(tail)
-				found <- res{n, buf.Bytes()}
+				found <- res{string(dst), n, buf.Bytes()}
 				return
 			}
 			h.Reset()
@@ -171,7 +178,7 @@ func find(hashPrefix, header string, commit []byte) (iteration int, newCommit []
 		}
 	}
 
-	return minRes.n, minRes.b
+	return minRes.hash, minRes.n, minRes.b
 }
 
 func headTail(commit []byte) (head, tail []byte) {

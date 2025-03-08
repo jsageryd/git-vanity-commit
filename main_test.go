@@ -77,7 +77,11 @@ committer Committer Name <committer@example.com> 1577876400 +0100`)
 }
 
 func TestFind(t *testing.T) {
-	iteration, newCommit := find("0", "foo", []byte(commit))
+	hash, iteration, newCommit := find("0", "foo", []byte(commit))
+
+	if got, want := hash, "034c4f788c4a7522a75e1b86ee3c24eee630e822"; got != want {
+		t.Errorf("hash = %q, want %q", got, want)
+	}
 
 	if got, want := iteration, 16; got != want {
 		t.Errorf("iteration = %d, want %d", got, want)
