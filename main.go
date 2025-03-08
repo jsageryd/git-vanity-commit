@@ -26,7 +26,8 @@ func main() {
 	commit := flag.String("commit", "HEAD", "Starting point")
 	prefix := flag.String("prefix", "", "Desired hash prefix (mandatory)")
 	key := flag.String("key", "", "Key used in the commit header (defaults to the prefix)")
-	reset := flag.Bool("reset", false, "If set, reset to the new commit")
+	reset := flag.Bool("reset", false, "If set, reset to the new commit (implies -write)")
+	write := flag.Bool("write", false, "If set, write the new commit to the repository (hash-object -w)")
 
 	flag.Parse()
 
@@ -65,11 +66,15 @@ func main() {
 
 	log.Printf("Found %s (iteration %d, %s)", hash, iteration, time.Since(start).Round(time.Millisecond))
 
-	writtenHash := writeCommit(newCommit)
+	if *write || *reset {
+		writtenHash := writeCommit(newCommit)
 
-	if hash != writtenHash {
-		fmt.Printf("hash mismatch: git-vanity-commit %q vs. hash-object output %q\n", hash, writtenHash)
-		os.Exit(1)
+		log.Println("Commit object written")
+
+		if hash != writtenHash {
+			fmt.Printf("hash mismatch: git-vanity-commit %q vs. hash-object output %q\n", hash, writtenHash)
+			os.Exit(1)
+		}
 	}
 
 	if *reset {
