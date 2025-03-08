@@ -196,7 +196,7 @@ committer Committer Name <committer@example.com> 1577876400 +0100`),
 }
 
 func BenchmarkFind(b *testing.B) {
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		find("c0ffee", "c0ffee", 0, []byte(commit))
 	}
 }
