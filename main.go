@@ -74,7 +74,10 @@ func main() {
 	headCommit := fetchCommit(*commit)
 	hash, iteration, newCommit := find(*prefix, *key, *startN, headCommit)
 
-	log.Printf("Found %s (iteration %d, %s)", hash, iteration, time.Since(start).Round(time.Millisecond))
+	duration := time.Since(start)
+
+	log.Printf("Tested %d commits at %d commits per second", (iteration - *startN), int(float64(iteration-*startN)/duration.Seconds()))
+	log.Printf("Found %s (iteration %d, %s)", hash, iteration, duration.Round(time.Millisecond))
 
 	if *write || *reset {
 		writtenHash := writeCommit(newCommit)
