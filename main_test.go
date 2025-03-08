@@ -195,6 +195,39 @@ committer Committer Name <committer@example.com> 1577876400 +0100`),
 	}
 }
 
+func TestThousandSeparate(t *testing.T) {
+	for n, tc := range []struct {
+		n    int
+		want string
+	}{
+		{-1000000000, "-1,000,000,000"},
+		{-100000000, "-100,000,000"},
+		{-10000000, "-10,000,000"},
+		{-1000000, "-1,000,000"},
+		{-100000, "-100,000"},
+		{-10000, "-10,000"},
+		{-1000, "-1,000"},
+		{-100, "-100"},
+		{-10, "-10"},
+		{-1, "-1"},
+		{0, "0"},
+		{1, "1"},
+		{10, "10"},
+		{100, "100"},
+		{1000, "1,000"},
+		{10000, "10,000"},
+		{100000, "100,000"},
+		{1000000, "1,000,000"},
+		{10000000, "10,000,000"},
+		{100000000, "100,000,000"},
+		{1000000000, "1,000,000,000"},
+	} {
+		if got, want := thousandSeparate(tc.n), tc.want; got != want {
+			t.Errorf("[%d] thousandSeparate(%d) = %q, want %q", n, tc.n, got, want)
+		}
+	}
+}
+
 func BenchmarkFind(b *testing.B) {
 	for b.Loop() {
 		find("c0ffee", "c0ffee", 0, []byte(commit))

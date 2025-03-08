@@ -76,7 +76,9 @@ func main() {
 
 	duration := time.Since(start)
 
-	log.Printf("Tested %d commits at %d commits per second", (iteration - *startN), int(float64(iteration-*startN)/duration.Seconds()))
+	ts := thousandSeparate
+
+	log.Printf("Tested %s commits at %s commits per second", ts((iteration - *startN)), ts(int(float64(iteration-*startN)/duration.Seconds())))
 	log.Printf("Found %s (iteration %d, %s)", hash, iteration, duration.Round(time.Millisecond))
 
 	if *write || *reset {
@@ -245,4 +247,25 @@ func resetTo(hash string) {
 	if err := exec.Command("git", "reset", hash).Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func thousandSeparate(n int) string {
+	var newS string
+
+	if n < 0 {
+		n = -n
+		newS = "-"
+	}
+
+	s := strconv.Itoa(n)
+
+	for n := range s {
+		if n != 0 && n%3 == len(s)%3 {
+			newS += ","
+		}
+
+		newS += string(s[n])
+	}
+
+	return newS
 }
