@@ -77,9 +77,9 @@ committer Committer Name <committer@example.com> 1577876400 +0100`)
 }
 
 func TestFind(t *testing.T) {
-	found := find("0", "foo", []byte(commit))
+	newCommit := find("0", "foo", []byte(commit))
 
-	wantFound := []byte(`tree 0000000000000000000000000000000000000000
+	wantNewCommit := []byte(`tree 0000000000000000000000000000000000000000
 author Author Name <author@example.com> 1577872800 +0000
 committer Committer Name <committer@example.com> 1577876400 +0100
 foo 16
@@ -87,8 +87,8 @@ foo 16
 Message
 `)
 
-	if !bytes.Equal(found, wantFound) {
-		t.Errorf("got %s, want %s", found, wantFound)
+	if !bytes.Equal(newCommit, wantNewCommit) {
+		t.Errorf("got %s, want %s", newCommit, wantNewCommit)
 	}
 }
 
