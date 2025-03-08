@@ -77,26 +77,68 @@ committer Committer Name <committer@example.com> 1577876400 +0100`)
 }
 
 func TestFind(t *testing.T) {
-	hash, iteration, newCommit := find("0", "foo", []byte(commit))
-
-	if got, want := hash, "034c4f788c4a7522a75e1b86ee3c24eee630e822"; got != want {
-		t.Errorf("hash = %q, want %q", got, want)
-	}
-
-	if got, want := iteration, 16; got != want {
-		t.Errorf("iteration = %d, want %d", got, want)
-	}
-
-	wantNewCommit := []byte(`tree 0000000000000000000000000000000000000000
+	for _, tc := range []struct {
+		desc          string
+		startN        int
+		wantHash      string
+		wantIteration int
+		wantNewCommit []byte
+	}{
+		{
+			desc:          "Start at 0th iteration",
+			startN:        0,
+			wantHash:      "034c4f788c4a7522a75e1b86ee3c24eee630e822",
+			wantIteration: 16,
+			wantNewCommit: []byte(`tree 0000000000000000000000000000000000000000
 author Author Name <author@example.com> 1577872800 +0000
 committer Committer Name <committer@example.com> 1577876400 +0100
 foo 16
 
 Message
-`)
+`),
+		},
+		{
+			desc:          "Start at final iteration",
+			startN:        16,
+			wantHash:      "034c4f788c4a7522a75e1b86ee3c24eee630e822",
+			wantIteration: 16,
+			wantNewCommit: []byte(`tree 0000000000000000000000000000000000000000
+author Author Name <author@example.com> 1577872800 +0000
+committer Committer Name <committer@example.com> 1577876400 +0100
+foo 16
 
-	if !bytes.Equal(newCommit, wantNewCommit) {
-		t.Errorf("new commit is:\n%s\n\nwant:\n%s", newCommit, wantNewCommit)
+Message
+`),
+		},
+		{
+			desc:          "Start after would-be final iteration",
+			startN:        17,
+			wantHash:      "0457314be0b9283e18224b8dfad77741d9f41cdf",
+			wantIteration: 43,
+			wantNewCommit: []byte(`tree 0000000000000000000000000000000000000000
+author Author Name <author@example.com> 1577872800 +0000
+committer Committer Name <committer@example.com> 1577876400 +0100
+foo 43
+
+Message
+`),
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			hash, iteration, newCommit := find("0", "foo", tc.startN, []byte(commit))
+
+			if got, want := hash, tc.wantHash; got != want {
+				t.Errorf("hash = %q, want %q", got, want)
+			}
+
+			if got, want := iteration, tc.wantIteration; got != want {
+				t.Errorf("iteration = %d, want %d", got, want)
+			}
+
+			if !bytes.Equal(newCommit, tc.wantNewCommit) {
+				t.Errorf("new commit is:\n%s\n\nwant:\n%s", newCommit, tc.wantNewCommit)
+			}
+		})
 	}
 }
 
@@ -155,6 +197,6 @@ committer Committer Name <committer@example.com> 1577876400 +0100`),
 
 func BenchmarkFind(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		find("c0ffee", "c0ffee", []byte(commit))
+		find("c0ffee", "c0ffee", 0, []byte(commit))
 	}
 }

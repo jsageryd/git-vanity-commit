@@ -28,6 +28,7 @@ func main() {
 	key := flag.String("key", "", "Key used in the commit header (defaults to the prefix)")
 	reset := flag.Bool("reset", false, "If set, reset to the new commit (implies -write)")
 	write := flag.Bool("write", false, "If set, write the new commit to the repository (hash-object -w)")
+	startN := flag.Int("start", 0, "Iteration to start from")
 
 	flag.Parse()
 
@@ -56,13 +57,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *startN < 0 {
+		fmt.Fprintln(os.Stderr, "starting iteration must be positive")
+		os.Exit(1)
+	}
+
 	log.Printf("Using commit at %s (%s)", *commit, revParseShort(*commit))
 	log.Printf("Finding hash prefixed %q", *prefix)
+
+	if *startN > 0 {
+		log.Printf("Starting at iteration %d", *startN)
+	}
 
 	start := time.Now()
 
 	headCommit := fetchCommit(*commit)
-	hash, iteration, newCommit := find(*prefix, *key, headCommit)
+	hash, iteration, newCommit := find(*prefix, *key, *startN, headCommit)
 
 	log.Printf("Found %s (iteration %d, %s)", hash, iteration, time.Since(start).Round(time.Millisecond))
 
@@ -99,7 +109,7 @@ func fetchCommit(ref string) []byte {
 	return out
 }
 
-func find(hashPrefix, header string, commit []byte) (hash string, iteration int, newCommit []byte) {
+func find(hashPrefix, header string, startN int, commit []byte) (hash string, iteration int, newCommit []byte) {
 	done := make(chan struct{})
 
 	type res struct {
@@ -163,7 +173,7 @@ func find(hashPrefix, header string, commit []byte) (hash string, iteration int,
 
 	log.Printf("Using %d concurrent workers", workers)
 
-	for i := 0; i < workers; i++ {
+	for i := startN; i < startN+workers; i++ {
 		go work(i, workers)
 	}
 
