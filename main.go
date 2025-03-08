@@ -61,10 +61,10 @@ func main() {
 	start := time.Now()
 
 	headCommit := fetchCommit(*commit)
-	newCommit := find(*prefix, *key, headCommit)
+	iteration, newCommit := find(*prefix, *key, headCommit)
 	hash := writeCommit(newCommit)
 
-	log.Printf("Found %s (%s)", hash, time.Since(start).Round(time.Millisecond))
+	log.Printf("Found %s (iteration %d, %s)", hash, iteration, time.Since(start).Round(time.Millisecond))
 
 	if *reset {
 		resetTo(hash)
@@ -88,7 +88,7 @@ func fetchCommit(ref string) []byte {
 	return out
 }
 
-func find(hashPrefix, header string, commit []byte) []byte {
+func find(hashPrefix, header string, commit []byte) (iteration int, newCommit []byte) {
 	done := make(chan struct{})
 
 	type res struct {
@@ -171,7 +171,7 @@ func find(hashPrefix, header string, commit []byte) []byte {
 		}
 	}
 
-	return minRes.b
+	return minRes.n, minRes.b
 }
 
 func headTail(commit []byte) (head, tail []byte) {
