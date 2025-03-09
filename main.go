@@ -65,15 +65,14 @@ func main() {
 	log.Printf("Using commit at %s (%s)", *commit, revParseShort(*commit))
 	log.Printf("Finding hash prefixed %q", *prefix)
 
+	headCommit := fetchCommit(*commit)
+
 	if *startN > 0 {
 		log.Printf("Starting at iteration %d", *startN)
 	}
 
 	start := time.Now()
-
-	headCommit := fetchCommit(*commit)
 	hash, iteration, newCommit := find(*prefix, *key, *startN, headCommit)
-
 	duration := time.Since(start)
 
 	ts := thousandSeparate
