@@ -67,6 +67,10 @@ func main() {
 
 	commitData := fetchCommit(*commit)
 
+	ts := thousandSeparate
+
+	log.Printf("Commit size %s bytes", ts(len(commitData)))
+
 	if *startN > 0 {
 		log.Printf("Starting at iteration %d", *startN)
 	}
@@ -74,8 +78,6 @@ func main() {
 	start := time.Now()
 	hash, iteration, newCommit := find(*prefix, *key, *startN, commitData)
 	duration := time.Since(start)
-
-	ts := thousandSeparate
 
 	log.Printf("Tested %s commits at %s commits per second", ts((iteration - *startN + 1)), ts(int(float64(iteration-*startN+1)/duration.Seconds())))
 	log.Printf("Found %s (iteration %d, %s)", hash, iteration, duration.Round(time.Millisecond))
