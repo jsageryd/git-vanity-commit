@@ -78,7 +78,7 @@ func main() {
 
 	ts := thousandSeparate
 
-	log.Printf("Tested %s commits at %s commits per second", ts((iteration - *startN)), ts(int(float64(iteration-*startN)/duration.Seconds())))
+	log.Printf("Tested %s commits at %s commits per second", ts((iteration - *startN + 1)), ts(int(float64(iteration-*startN+1)/duration.Seconds())))
 	log.Printf("Found %s (iteration %d, %s)", hash, iteration, duration.Round(time.Millisecond))
 
 	if *write || *reset {
