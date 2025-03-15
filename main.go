@@ -148,12 +148,21 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		head, tail := headTail(commit)
 		head = trimHeader(head, header)
 
-		dst := make([]byte, sha1.Size*2)
 		scratch := make([]byte, 0, sha1.Size)
 
 		commitHeaderBytes := []byte("commit ")
 		headerBytes := []byte("\n" + header + " ")
 		nullByte := []byte{0x00}
+
+		hashMask := byte(0xff)
+		var suffix string
+
+		if len(hashPrefix)%2 != 0 {
+			hashMask = 0xf0
+			suffix = "0"
+		}
+
+		hashPrefixBytes, _ := hex.DecodeString(hashPrefix + suffix)
 
 		var nBytes []byte
 		var commitSizeBytes []byte
@@ -170,14 +179,14 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 			h.Write(nBytes)
 			h.Write(tail)
 			candidate := h.Sum(scratch[:0])
-			hex.Encode(dst, candidate)
-			if bytes.Equal(dst[:len(hashPrefix)], []byte(hashPrefix)) {
+			if bytes.HasPrefix(candidate, hashPrefixBytes[:len(hashPrefixBytes)-1]) &&
+				candidate[len(hashPrefixBytes)-1]&hashMask == hashPrefixBytes[len(hashPrefixBytes)-1]&hashMask {
 				buf := new(bytes.Buffer)
 				buf.Write(head)
 				buf.Write(headerBytes)
 				buf.Write(nBytes)
 				buf.Write(tail)
-				found <- res{string(dst), n, buf.Bytes()}
+				found <- res{hex.EncodeToString(candidate), n, buf.Bytes()}
 				return
 			}
 			h.Reset()
