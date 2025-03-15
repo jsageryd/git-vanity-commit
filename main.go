@@ -151,19 +151,31 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		dst := make([]byte, sha1.Size*2)
 		scratch := make([]byte, 0, sha1.Size)
 
+		commitHeaderBytes := []byte("commit ")
+		headerBytes := []byte("\n" + header + " ")
+		nullByte := []byte{0x00}
+
+		var nBytes []byte
+		var commitSizeBytes []byte
+
 		for n := offset; ; n += stepSize {
-			nStr := strconv.Itoa(n)
-			commitSize := len(head) + len(tail) + len(header) + 1 + len(nStr) + 1
-			h.Write([]byte("commit " + strconv.Itoa(commitSize) + "\x00"))
+			nBytes = strconv.AppendInt(nBytes[:0], int64(n), 10)
+			commitSize := len(head) + len(tail) + len(header) + 1 + len(nBytes) + 1
+			commitSizeBytes = strconv.AppendInt(commitSizeBytes[:0], int64(commitSize), 10)
+			h.Write(commitHeaderBytes)
+			h.Write(commitSizeBytes)
+			h.Write(nullByte)
 			h.Write(head)
-			h.Write([]byte("\n" + header + " " + nStr))
+			h.Write(headerBytes)
+			h.Write(nBytes)
 			h.Write(tail)
 			candidate := h.Sum(scratch[:0])
 			hex.Encode(dst, candidate)
 			if bytes.Equal(dst[:len(hashPrefix)], []byte(hashPrefix)) {
 				buf := new(bytes.Buffer)
 				buf.Write(head)
-				buf.Write([]byte("\n" + header + " " + nStr))
+				buf.Write(headerBytes)
+				buf.Write(nBytes)
 				buf.Write(tail)
 				found <- res{string(dst), n, buf.Bytes()}
 				return
