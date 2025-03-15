@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -28,6 +29,7 @@ func main() {
 	key := flag.String("key", "", "Key used in the commit header (defaults to the prefix)")
 	reset := flag.Bool("reset", false, "If set, reset to the new commit (implies -write)")
 	write := flag.Bool("write", false, "If set, write the new commit to the repository (hash-object -w)")
+	quiet := flag.Bool("quiet", false, "Suppress log output")
 	startN := flag.Int("start", 0, "Iteration to start from")
 
 	flag.Parse()
@@ -60,6 +62,10 @@ func main() {
 	if *startN < 0 {
 		fmt.Fprintln(os.Stderr, "starting iteration must be positive")
 		os.Exit(1)
+	}
+
+	if *quiet {
+		log.SetOutput(io.Discard)
 	}
 
 	log.Printf("Using commit at %s (%s)", *commit, revParseShort(*commit))
