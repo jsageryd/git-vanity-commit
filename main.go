@@ -29,6 +29,7 @@ func main() {
 	key := flag.String("key", "", "Key used in the commit header (defaults to the prefix)")
 	reset := flag.Bool("reset", false, "If set, reset to the new commit (implies -write)")
 	write := flag.Bool("write", false, "If set, write the new commit to the repository (hash-object -w)")
+	printHash := flag.Bool("print", false, "Print the commit hash found to stdout")
 	quiet := flag.Bool("quiet", false, "Suppress log output")
 	startN := flag.Int("start", 0, "Iteration to start from")
 
@@ -87,6 +88,10 @@ func main() {
 
 	log.Printf("Tested %s commits at %s commits per second", ts((iteration - *startN + 1)), ts(int(float64(iteration-*startN+1)/duration.Seconds())))
 	log.Printf("Found %s (iteration %d, %s)", hash, iteration, duration.Round(time.Millisecond))
+
+	if *printHash {
+		fmt.Println(hash)
+	}
 
 	if *write || *reset {
 		writtenHash := writeCommit(newCommit)
