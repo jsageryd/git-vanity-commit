@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"io"
 	"log"
 	"testing"
@@ -139,6 +140,19 @@ Message
 				t.Errorf("new commit is:\n%s\n\nwant:\n%s", newCommit, tc.wantNewCommit)
 			}
 		})
+	}
+}
+
+func TestCopySHA1Hash(t *testing.T) {
+	h1 := sha1.New()
+	h2 := sha1.New()
+
+	h1.Write([]byte("hello"))
+
+	copySHA1Hash(h2, h1)
+
+	if got, want := h1.Sum(nil), h2.Sum(nil); !bytes.Equal(got, want) {
+		t.Error("hashes differ")
 	}
 }
 

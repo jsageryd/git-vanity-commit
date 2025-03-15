@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"hash"
 	"io"
 	"log"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"unsafe"
 )
 
 var invalidKey = regexp.MustCompile(`^(commit|tree|parent|author|committer|encoding)\b|[^a-zA-Z0-9]`).MatchString
@@ -167,15 +169,24 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		var nBytes []byte
 		var commitSizeBytes []byte
 
+		var lastCommitSize int
+		lastH := sha1.New()
+
 		for n := offset; ; n += stepSize {
 			nBytes = strconv.AppendInt(nBytes[:0], int64(n), 10)
 			commitSize := len(head) + len(tail) + len(header) + 1 + len(nBytes) + 1
-			commitSizeBytes = strconv.AppendInt(commitSizeBytes[:0], int64(commitSize), 10)
-			h.Write(commitHeaderBytes)
-			h.Write(commitSizeBytes)
-			h.Write(nullByte)
-			h.Write(head)
-			h.Write(headerBytes)
+			if lastCommitSize != commitSize {
+				h.Reset()
+				commitSizeBytes = strconv.AppendInt(commitSizeBytes[:0], int64(commitSize), 10)
+				h.Write(commitHeaderBytes)
+				h.Write(commitSizeBytes)
+				h.Write(nullByte)
+				h.Write(head)
+				h.Write(headerBytes)
+				copySHA1Hash(lastH, h)
+				lastCommitSize = commitSize
+			}
+			copySHA1Hash(h, lastH)
 			h.Write(nBytes)
 			h.Write(tail)
 			candidate := h.Sum(scratch[:0])
@@ -189,7 +200,6 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 				found <- res{hex.EncodeToString(candidate), n, buf.Bytes()}
 				return
 			}
-			h.Reset()
 
 			select {
 			case <-done:
@@ -232,6 +242,22 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 	}
 
 	return minRes.hash, minRes.n, minRes.b
+}
+
+func copySHA1Hash(dst, src hash.Hash) {
+	type eface struct {
+		_type uintptr
+		data  unsafe.Pointer
+	}
+
+	type digest struct {
+		h   [5]uint32
+		x   [64]byte
+		nx  int
+		len uint64
+	}
+
+	*(*digest)((*eface)(unsafe.Pointer(&dst)).data) = *(*digest)((*eface)(unsafe.Pointer(&src)).data)
 }
 
 func headTail(commit []byte) (head, tail []byte) {
