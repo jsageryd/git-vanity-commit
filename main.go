@@ -86,7 +86,13 @@ func main() {
 	}
 
 	start := time.Now()
-	hash, iteration, newCommit := find(*prefix, *key, *startN, commitData)
+
+	hash, iteration, newCommit, ok := find(*prefix, *key, *startN, commitData)
+	if !ok {
+		log.Println("No hash found")
+		os.Exit(1)
+	}
+
 	duration := time.Since(start)
 
 	log.Printf("Tested %s commits at %s commits per second", ts((iteration - *startN + 1)), ts(int(float64(iteration-*startN+1)/duration.Seconds())))
@@ -151,7 +157,7 @@ func fetchCommit(ref string) []byte {
 	return out
 }
 
-func find(hashPrefix, header string, startN int, commit []byte) (hash string, iteration int, newCommit []byte) {
+func find(hashPrefix, header string, startN int, commit []byte) (hash string, iteration int, newCommit []byte, ok bool) {
 	done := make(chan struct{})
 
 	type res struct {
@@ -195,7 +201,7 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		var lastCommitSize int
 		lastH := sha1.New()
 
-		for n := offset; ; n += stepSize {
+		for n := offset; n >= 0; n += stepSize {
 			nBytes = strconv.AppendInt(nBytes[:0], int64(n), 10)
 			commitSize := len(head) + len(tail) + len(header) + 1 + len(nBytes) + 1
 			if lastCommitSize != commitSize {
@@ -240,12 +246,15 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		workers = numCPU
 	}
 
-	wg.Add(workers)
-
 	log.Printf("Using %d concurrent workers", workers)
 
-	for i := startN; i < startN+workers; i++ {
-		go work(i, workers)
+	for i := range workers {
+		offset := startN + i
+		if offset < 0 {
+			break
+		}
+		wg.Add(1)
+		go work(offset, workers)
 	}
 
 	go func() {
@@ -253,7 +262,7 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		close(found)
 	}()
 
-	minRes := <-found
+	minRes, ok := <-found
 	firstN = minRes.n
 
 	close(done)
@@ -264,7 +273,7 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		}
 	}
 
-	return minRes.hash, minRes.n, minRes.b
+	return minRes.hash, minRes.n, minRes.b, ok
 }
 
 func copySHA1Hash(dst, src hash.Hash) {

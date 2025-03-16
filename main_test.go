@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"io"
 	"log"
+	"math"
 	"testing"
 )
 
@@ -81,12 +82,15 @@ func TestFind(t *testing.T) {
 	for _, tc := range []struct {
 		desc          string
 		startN        int
+		prefix        string
 		wantHash      string
 		wantIteration int
 		wantNewCommit []byte
+		wantOK        bool
 	}{
 		{
 			desc:          "Start at 0th iteration",
+			prefix:        "0",
 			startN:        0,
 			wantHash:      "034c4f788c4a7522a75e1b86ee3c24eee630e822",
 			wantIteration: 16,
@@ -97,9 +101,11 @@ foo 16
 
 Message
 `),
+			wantOK: true,
 		},
 		{
 			desc:          "Start at final iteration",
+			prefix:        "0",
 			startN:        16,
 			wantHash:      "034c4f788c4a7522a75e1b86ee3c24eee630e822",
 			wantIteration: 16,
@@ -110,9 +116,11 @@ foo 16
 
 Message
 `),
+			wantOK: true,
 		},
 		{
 			desc:          "Start after would-be final iteration",
+			prefix:        "0",
 			startN:        17,
 			wantHash:      "0457314be0b9283e18224b8dfad77741d9f41cdf",
 			wantIteration: 43,
@@ -123,10 +131,20 @@ foo 43
 
 Message
 `),
+			wantOK: true,
+		},
+		{
+			desc:          "Start at maxint iteration",
+			prefix:        "1",
+			startN:        math.MaxInt,
+			wantHash:      "",
+			wantIteration: 0,
+			wantNewCommit: nil,
+			wantOK:        false,
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			hash, iteration, newCommit := find("0", "foo", tc.startN, []byte(commit))
+			hash, iteration, newCommit, ok := find(tc.prefix, "foo", tc.startN, []byte(commit))
 
 			if got, want := hash, tc.wantHash; got != want {
 				t.Errorf("hash = %q, want %q", got, want)
@@ -138,6 +156,10 @@ Message
 
 			if !bytes.Equal(newCommit, tc.wantNewCommit) {
 				t.Errorf("new commit is:\n%s\n\nwant:\n%s", newCommit, tc.wantNewCommit)
+			}
+
+			if got, want := ok, tc.wantOK; got != want {
+				t.Errorf("ok = %t, want %t", got, want)
 			}
 		})
 	}
