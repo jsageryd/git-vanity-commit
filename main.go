@@ -121,9 +121,9 @@ func revParseShort(rev string) string {
 }
 
 func fetchCommit(ref string) []byte {
-	out, err := exec.Command("git", "cat-file", "-p", ref).Output()
+	out, err := exec.Command("git", "cat-file", "commit", ref).Output()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("error reading commit: %v", err)
 	}
 	return out
 }
