@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -71,10 +72,10 @@ func main() {
 		log.SetOutput(io.Discard)
 	}
 
+	commitData := fetchCommit(*commit)
+
 	log.Printf("Using commit at %s (%s)", *commit, revParseShort(*commit))
 	log.Printf("Finding hash prefixed %q", *prefix)
-
-	commitData := fetchCommit(*commit)
 
 	ts := thousandSeparate
 
@@ -115,15 +116,37 @@ func main() {
 func revParseShort(rev string) string {
 	out, err := exec.Command("git", "rev-parse", "--short=12", "--verify", rev).Output()
 	if err != nil {
-		log.Fatalf("cannot find commit: %v", err)
+		if eErr, ok := err.(*exec.ExitError); ok {
+			log.Fatalf("error parsing revision; git says %v", string(eErr.Stderr))
+		} else {
+			log.Fatalf("error parsing revision: %v", err)
+		}
 	}
 	return string(bytes.TrimSpace(out))
 }
 
 func fetchCommit(ref string) []byte {
-	out, err := exec.Command("git", "cat-file", "commit", ref).Output()
+	shortRef := revParseShort(ref)
+
+	out, err := exec.Command("git", "cat-file", "-t", ref).Output()
 	if err != nil {
-		log.Fatalf("error reading commit: %v", err)
+		if eErr, ok := err.(*exec.ExitError); ok {
+			log.Fatalf("error reading object type; git says %v", string(eErr.Stderr))
+		} else {
+			log.Fatalf("error reading object type: %v", err)
+		}
+	}
+	if got, want := strings.TrimSpace(string(out)), "commit"; got != want {
+		log.Fatalf("%s is a %s object; expected a commit", shortRef, got)
+	}
+
+	out, err = exec.Command("git", "cat-file", "commit", ref).Output()
+	if err != nil {
+		if eErr, ok := err.(*exec.ExitError); ok {
+			log.Fatalf("error reading commit; git says %v", string(eErr.Stderr))
+		} else {
+			log.Fatalf("error reading commit: %v", err)
+		}
 	}
 	return out
 }
@@ -296,7 +319,11 @@ func writeCommit(commit []byte) (hash string) {
 
 	out, err := cmd.Output()
 	if err != nil {
-		log.Fatal(err)
+		if eErr, ok := err.(*exec.ExitError); ok {
+			log.Fatalf("error writing object; git says %v", string(eErr.Stderr))
+		} else {
+			log.Fatalf("error writing object: %v", err)
+		}
 	}
 
 	return string(bytes.TrimSpace(out))
@@ -304,7 +331,11 @@ func writeCommit(commit []byte) (hash string) {
 
 func resetTo(hash string) {
 	if err := exec.Command("git", "reset", hash).Run(); err != nil {
-		log.Fatal(err)
+		if eErr, ok := err.(*exec.ExitError); ok {
+			log.Fatalf("error resetting to commit; git says %v", string(eErr.Stderr))
+		} else {
+			log.Fatalf("error resettting to commit: %v", err)
+		}
 	}
 }
 
