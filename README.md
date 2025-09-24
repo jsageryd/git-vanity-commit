@@ -2,6 +2,10 @@
 
 [![License MIT](https://img.shields.io/badge/license-MIT-lightgrey.svg?style=flat)](https://github.com/jsageryd/git-vanity-commit/blob/master/LICENSE)
 
+This tool finds commit hash prefixes. It does this by appending a commit header
+with a number, incremented until the given hash prefix is found. Without either
+of `-reset` or `-write` specified, nothing is written to the repository.
+
 ## Installation
 ```
 go install github.com/jsageryd/git-vanity-commit@latest
