@@ -7,7 +7,29 @@
 go install github.com/jsageryd/git-vanity-commit@latest
 ```
 
-## Usage example
+## Usage
+```
+$ git-vanity-commit -h
+Usage of git-vanity-commit:
+  -commit string
+        Starting point (default "HEAD")
+  -key string
+        Key used in the commit header (defaults to the prefix)
+  -prefix string
+        Desired hash prefix (mandatory)
+  -print
+        Print the commit hash found to stdout
+  -quiet
+        Suppress log output
+  -reset
+        If set, reset to the new commit (implies -write)
+  -start int
+        Iteration to start from
+  -write
+        If set, write the new commit to the repository (hash-object -w)
+```
+
+### Example
 ```
 $ git-vanity-commit -prefix=c0ffee -reset
 17:03:16 | Using commit at HEAD (a27993c18f78)
