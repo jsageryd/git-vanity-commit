@@ -9,25 +9,13 @@ go install github.com/jsageryd/git-vanity-commit@latest
 
 ## Usage example
 ```
-$ git init && git add . && git commit -m 'Initial commit'
-Initialized empty Git repository in /Users/j/go/src/github.com/jsageryd/git-vanity-commit/.git/
-[master (root-commit) 8f155be] Initial commit
- 4 files changed, 237 insertions(+)
- create mode 100644 LICENSE
- create mode 100644 README.md
- create mode 100644 main.go
- create mode 100644 main_test.go
-```
-
-```
 $ git-vanity-commit -prefix=c0ffee -reset
-21:20:20 | Using commit at HEAD (8f155be96971)
-21:20:20 | Finding hash prefixed "c0ffee"
-21:20:31 | Found c0ffee9c331bc17c9e9605fcfbdcfcd439ada240 (10.786s)
-21:20:31 | HEAD is now at c0ffee9c331bc17c9e9605fcfbdcfcd439ada240
-```
-
-```
-$ git log --oneline
-c0ffee9 (HEAD -> master) Initial commit
+17:03:16 | Using commit at HEAD (a27993c18f78)
+17:03:16 | Finding hash prefixed "c0ffee"
+17:03:16 | Commit size 154 bytes
+17:03:16 | Using 8 concurrent workers
+17:03:16 | Tested 39,051,709 commits at 80,349,673 commits per second
+17:03:16 | Found c0ffee83124285d152bd620725476c8a0eb9714e (iteration 39051708, 486ms)
+17:03:16 | Commit object written
+17:03:16 | HEAD is now at c0ffee83124285d152bd620725476c8a0eb9714e
 ```
