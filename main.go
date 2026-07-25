@@ -176,6 +176,8 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		defer wg.Done()
 
 		h := sha1.New()
+		hashState := sha1State(h)
+
 		head, tail := headTail(commit)
 		head = trimHeader(head, header)
 
@@ -199,7 +201,7 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		var commitSizeBytes []byte
 
 		var lastCommitSize int
-		lastH := sha1.New()
+		var lastHashState sha1Digest
 
 		for n := offset; n >= 0; n += stepSize {
 			nBytes = strconv.AppendInt(nBytes[:0], int64(n), 10)
@@ -212,10 +214,10 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 				h.Write(nullByte)
 				h.Write(head)
 				h.Write(headerBytes)
-				copySHA1Hash(lastH, h)
+				lastHashState = *hashState
 				lastCommitSize = commitSize
 			}
-			copySHA1Hash(h, lastH)
+			*hashState = lastHashState
 			h.Write(nBytes)
 			h.Write(tail)
 			candidate := h.Sum(scratch[:0])
@@ -276,20 +278,20 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 	return minRes.hash, minRes.n, minRes.b, ok
 }
 
-func copySHA1Hash(dst, src hash.Hash) {
+type sha1Digest struct {
+	h   [5]uint32
+	x   [64]byte
+	nx  int
+	len uint64
+}
+
+func sha1State(h hash.Hash) *sha1Digest {
 	type eface struct {
 		_type uintptr
 		data  unsafe.Pointer
 	}
 
-	type digest struct {
-		h   [5]uint32
-		x   [64]byte
-		nx  int
-		len uint64
-	}
-
-	*(*digest)((*eface)(unsafe.Pointer(&dst)).data) = *(*digest)((*eface)(unsafe.Pointer(&src)).data)
+	return (*sha1Digest)((*eface)(unsafe.Pointer(&h)).data)
 }
 
 func headTail(commit []byte) (head, tail []byte) {
