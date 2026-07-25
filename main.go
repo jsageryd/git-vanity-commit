@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha1"
+	"encoding/binary"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -181,8 +182,6 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		head, tail := headTail(commit)
 		head = trimHeader(head, header)
 
-		scratch := make([]byte, 0, sha1.Size)
-
 		commitHeaderBytes := []byte("commit ")
 		headerBytes := []byte("\n" + header + " ")
 		nullByte := []byte{0x00}
@@ -203,6 +202,10 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		var lastCommitSize int
 		var lastHashState sha1Digest
 
+		var nBytesTailAndPadding []byte
+
+		var sum [sha1.Size]byte
+
 		for n := offset; n >= 0; n += stepSize {
 			nBytes = strconv.AppendInt(nBytes[:0], int64(n), 10)
 			commitSize := len(head) + len(tail) + len(header) + 1 + len(nBytes) + 1
@@ -216,11 +219,21 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 				h.Write(headerBytes)
 				lastHashState = *hashState
 				lastCommitSize = commitSize
+
+				objectSize := len(commitHeaderBytes) + len(commitSizeBytes) + len(nullByte) + commitSize
+
+				nBytesTailAndPadding = paddedNSizeTailBlock(lastHashState.nx, len(nBytes), tail, objectSize)
 			}
+			copy(nBytesTailAndPadding, nBytes)
 			*hashState = lastHashState
-			h.Write(nBytes)
-			h.Write(tail)
-			candidate := h.Sum(scratch[:0])
+			h.Write(nBytesTailAndPadding)
+
+			for i, w := range hashState.h {
+				binary.BigEndian.PutUint32(sum[i*4:], w)
+			}
+
+			candidate := sum[:]
+
 			if bytes.HasPrefix(candidate, hashPrefixBytes[:len(hashPrefixBytes)-1]) &&
 				candidate[len(hashPrefixBytes)-1]&hashMask == hashPrefixBytes[len(hashPrefixBytes)-1]&hashMask {
 				buf := new(bytes.Buffer)
@@ -292,6 +305,26 @@ func sha1State(h hash.Hash) *sha1Digest {
 	}
 
 	return (*sha1Digest)((*eface)(unsafe.Pointer(&h)).data)
+}
+
+// paddedNSizeTailBlock returns a buffer that leaves nLen bytes at the front for
+// the caller to fill in the nonce, followed by the given tail and SHA-1
+// padding.
+func paddedNSizeTailBlock(nx, nLen int, tail []byte, objectSize int) []byte {
+	size := nx + nLen + len(tail) + 1 + 8
+
+	if r := size % sha1.BlockSize; r != 0 {
+		size += sha1.BlockSize - r
+	}
+
+	size -= nx
+
+	block := make([]byte, size)
+	copy(block[nLen:], tail)
+	block[nLen+len(tail)] = 0x80
+	binary.BigEndian.PutUint64(block[size-8:], uint64(objectSize)*8)
+
+	return block
 }
 
 func headTail(commit []byte) (head, tail []byte) {

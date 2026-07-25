@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"crypto/sha1"
+	"encoding/binary"
 	"io"
 	"log"
 	"math"
+	"slices"
 	"testing"
 )
 
@@ -176,6 +178,43 @@ func TestSHA1State(t *testing.T) {
 
 	if got, want := h2.Sum(nil), h1.Sum(nil); !bytes.Equal(got, want) {
 		t.Error("hashes differ")
+	}
+}
+
+func TestPaddedNSizeTailBlock(t *testing.T) {
+	for messageLen := range 3 * sha1.BlockSize {
+		head := []byte("foo")
+		message := bytes.Repeat([]byte("x"), messageLen)
+
+		h := sha1.New()
+
+		nBytes := []byte("12345")
+
+		h.Write(head)
+
+		objectSize := len(head) + len(nBytes) + len(message)
+
+		block := paddedNSizeTailBlock(sha1State(h).nx, len(nBytes), message, objectSize)
+
+		if (sha1State(h).nx+len(block))%sha1.BlockSize != 0 {
+			t.Fatalf("[%d] padded size is %d, want a multiple of %d", messageLen, sha1State(h).nx+len(block), sha1.BlockSize)
+		}
+
+		copy(block, nBytes)
+
+		h.Write(block)
+
+		var gotSum [sha1.Size]byte
+
+		for i, w := range sha1State(h).h {
+			binary.BigEndian.PutUint32(gotSum[i*4:], w)
+		}
+
+		wantSum := sha1.Sum(slices.Concat(head, nBytes, message))
+
+		if gotSum != wantSum {
+			t.Errorf("[%d] got %x, want %x", messageLen, gotSum, wantSum)
+		}
 	}
 }
 
