@@ -194,13 +194,19 @@ func TestPaddedNSizeTailBlock(t *testing.T) {
 
 		objectSize := len(head) + len(nBytes) + len(message)
 
-		block := paddedNSizeTailBlock(sha1State(h).nx, len(nBytes), message, objectSize)
+		hashState := sha1State(h)
 
-		if (sha1State(h).nx+len(block))%sha1.BlockSize != 0 {
-			t.Fatalf("[%d] padded size is %d, want a multiple of %d", messageLen, sha1State(h).nx+len(block), sha1.BlockSize)
+		nOffset := hashState.nx
+
+		block := paddedNSizeTailBlock(hashState.x[:hashState.nx], len(nBytes), message, objectSize)
+
+		hashState.nx = 0
+
+		if len(block)%sha1.BlockSize != 0 {
+			t.Fatalf("[%d] padded size is %d, want a multiple of %d", messageLen, len(block), sha1.BlockSize)
 		}
 
-		copy(block, nBytes)
+		copy(block[nOffset:], nBytes)
 
 		h.Write(block)
 

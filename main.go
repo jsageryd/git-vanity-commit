@@ -204,6 +204,8 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 
 		var nBytesTailAndPadding []byte
 
+		var nOffset int
+
 		var sum [sha1.Size]byte
 
 		for n := offset; n >= 0; n += stepSize {
@@ -222,9 +224,12 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 
 				objectSize := len(commitHeaderBytes) + len(commitSizeBytes) + len(nullByte) + commitSize
 
-				nBytesTailAndPadding = paddedNSizeTailBlock(lastHashState.nx, len(nBytes), tail, objectSize)
+				nBytesTailAndPadding = paddedNSizeTailBlock(lastHashState.x[:lastHashState.nx], len(nBytes), tail, objectSize)
+				nOffset = lastHashState.nx
+
+				lastHashState.nx = 0
 			}
-			copy(nBytesTailAndPadding, nBytes)
+			copy(nBytesTailAndPadding[nOffset:], nBytes)
 			*hashState = lastHashState
 			h.Write(nBytesTailAndPadding)
 
@@ -307,21 +312,20 @@ func sha1State(h hash.Hash) *sha1Digest {
 	return (*sha1Digest)((*eface)(unsafe.Pointer(&h)).data)
 }
 
-// paddedNSizeTailBlock returns a buffer that leaves nLen bytes at the front for
-// the caller to fill in the nonce, followed by the given tail and SHA-1
-// padding.
-func paddedNSizeTailBlock(nx, nLen int, tail []byte, objectSize int) []byte {
-	size := nx + nLen + len(tail) + 1 + 8
+// paddedNSizeTailBlock returns a buffer that starts with the given already
+// buffered bytes, leaves nLen bytes for the caller to fill in the nonce, and
+// ends with the given tail and the SHA-1 padding, on a block boundary.
+func paddedNSizeTailBlock(buffered []byte, nLen int, tail []byte, objectSize int) []byte {
+	size := len(buffered) + nLen + len(tail) + 1 + 8
 
 	if r := size % sha1.BlockSize; r != 0 {
 		size += sha1.BlockSize - r
 	}
 
-	size -= nx
-
 	block := make([]byte, size)
-	copy(block[nLen:], tail)
-	block[nLen+len(tail)] = 0x80
+	nOffset := copy(block, buffered)
+	copy(block[nOffset+nLen:], tail)
+	block[nOffset+nLen+len(tail)] = 0x80
 	binary.BigEndian.PutUint64(block[size-8:], uint64(objectSize)*8)
 
 	return block
