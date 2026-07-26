@@ -159,6 +159,8 @@ func fetchCommit(ref string) []byte {
 }
 
 func find(hashPrefix, header string, startN int, commit []byte) (hash string, iteration int, newCommit []byte, ok bool) {
+	const pollInterval = 256
+
 	done := make(chan struct{})
 
 	type res struct {
@@ -195,7 +197,7 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 
 		var nBytesTailAndPadding []byte
 
-		for n := offset; n >= 0; n += stepSize {
+		for n, poll := offset, 0; n >= 0; n += stepSize {
 			if !addToDigits(nBytes, stepSize) {
 				nBytes = strconv.AppendInt(nBytes[:0], int64(n), 10)
 				commitSize := len(head) + len(tail) + len(header) + 1 + len(nBytes) + 1
@@ -235,12 +237,16 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 				return
 			}
 
-			select {
-			case <-done:
-				if n > firstN {
-					return
+			if poll++; poll == pollInterval {
+				poll = 0
+
+				select {
+				case <-done:
+					if n > firstN {
+						return
+					}
+				default:
 				}
-			default:
 			}
 		}
 	}
