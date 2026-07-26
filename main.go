@@ -199,19 +199,16 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		var nBytes []byte
 		var commitSizeBytes []byte
 
-		var lastCommitSize int
 		var lastSum [5]uint32
 
 		var nBytesTailAndPadding []byte
 
-		var nOffset int
-
 		var sum [sha1.Size]byte
 
 		for n := offset; n >= 0; n += stepSize {
-			nBytes = strconv.AppendInt(nBytes[:0], int64(n), 10)
-			commitSize := len(head) + len(tail) + len(header) + 1 + len(nBytes) + 1
-			if lastCommitSize != commitSize {
+			if !addToDigits(nBytes, stepSize) {
+				nBytes = strconv.AppendInt(nBytes[:0], int64(n), 10)
+				commitSize := len(head) + len(tail) + len(header) + 1 + len(nBytes) + 1
 				h.Reset()
 				commitSizeBytes = strconv.AppendInt(commitSizeBytes[:0], int64(commitSize), 10)
 				h.Write(commitHeaderBytes)
@@ -220,16 +217,16 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 				h.Write(head)
 				h.Write(headerBytes)
 				lastSum = hashState.h
-				lastCommitSize = commitSize
 
 				objectSize := len(commitHeaderBytes) + len(commitSizeBytes) + len(nullByte) + commitSize
 
-				nBytesTailAndPadding = paddedNSizeTailBlock(hashState.x[:hashState.nx], len(nBytes), tail, objectSize)
-				nOffset = hashState.nx
+				nOffset := hashState.nx
+				nBytesTailAndPadding = paddedNSizeTailBlock(hashState.x[:nOffset], len(nBytes), tail, objectSize)
+				copy(nBytesTailAndPadding[nOffset:], nBytes)
+				nBytes = nBytesTailAndPadding[nOffset : nOffset+len(nBytes)]
 
 				hashState.nx = 0
 			}
-			copy(nBytesTailAndPadding[nOffset:], nBytes)
 			hashState.h = lastSum
 			h.Write(nBytesTailAndPadding)
 
@@ -310,6 +307,23 @@ func sha1State(h hash.Hash) *sha1Digest {
 	}
 
 	return (*sha1Digest)((*eface)(unsafe.Pointer(&h)).data)
+}
+
+// addToDigits adds step to the decimal digits in place. It reports whether the
+// result still fits in the same number of digits.
+func addToDigits(digits []byte, step int) bool {
+	carry := step
+
+	for i := len(digits) - 1; i >= 0; i-- {
+		if carry == 0 {
+			return true
+		}
+		v := int(digits[i]-'0') + carry
+		digits[i] = byte('0' + v%10)
+		carry = v / 10
+	}
+
+	return carry == 0
 }
 
 // paddedNSizeTailBlock returns a buffer that starts with the given already

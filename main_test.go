@@ -224,6 +224,36 @@ func TestPaddedNSizeTailBlock(t *testing.T) {
 	}
 }
 
+func TestAddToDigits(t *testing.T) {
+	for n, tc := range []struct {
+		digits string
+		step   int
+		want   string
+		wantOK bool
+	}{
+		{"0", 1, "1", true},
+		{"0", 9, "9", true},
+		{"0", 10, "0", false},
+		{"5", 5, "0", false},
+		{"99", 1, "00", false},
+		{"98", 1, "99", true},
+		{"1234", 8, "1242", true},
+		{"9995", 8, "0003", false},
+		{"999999999", 8, "000000007", false},
+		{"123456789", 8, "123456797", true},
+	} {
+		digits := []byte(tc.digits)
+
+		if got, want := addToDigits(digits, tc.step), tc.wantOK; got != want {
+			t.Errorf("[%d] addToDigits(%q, %d) = %t, want %t", n, tc.digits, tc.step, got, want)
+		}
+
+		if got, want := string(digits), tc.want; got != want {
+			t.Errorf("[%d] digits are %q, want %q", n, got, want)
+		}
+	}
+}
+
 func TestTrimHeader(t *testing.T) {
 	for n, tc := range []struct {
 		head   []byte
