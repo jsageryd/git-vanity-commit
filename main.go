@@ -200,7 +200,7 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		var commitSizeBytes []byte
 
 		var lastCommitSize int
-		var lastHashState sha1Digest
+		var lastSum [5]uint32
 
 		var nBytesTailAndPadding []byte
 
@@ -219,18 +219,18 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 				h.Write(nullByte)
 				h.Write(head)
 				h.Write(headerBytes)
-				lastHashState = *hashState
+				lastSum = hashState.h
 				lastCommitSize = commitSize
 
 				objectSize := len(commitHeaderBytes) + len(commitSizeBytes) + len(nullByte) + commitSize
 
-				nBytesTailAndPadding = paddedNSizeTailBlock(lastHashState.x[:lastHashState.nx], len(nBytes), tail, objectSize)
-				nOffset = lastHashState.nx
+				nBytesTailAndPadding = paddedNSizeTailBlock(hashState.x[:hashState.nx], len(nBytes), tail, objectSize)
+				nOffset = hashState.nx
 
-				lastHashState.nx = 0
+				hashState.nx = 0
 			}
 			copy(nBytesTailAndPadding[nOffset:], nBytes)
-			*hashState = lastHashState
+			hashState.h = lastSum
 			h.Write(nBytesTailAndPadding)
 
 			for i, w := range hashState.h {
