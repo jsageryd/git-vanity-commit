@@ -254,6 +254,33 @@ func TestAddToDigits(t *testing.T) {
 	}
 }
 
+func TestHashPrefixWords(t *testing.T) {
+	for n, tc := range []struct {
+		prefix    string
+		wantWords [5]uint32
+		wantMask  [5]uint32
+		wantN     int
+	}{
+		{"0", [5]uint32{}, [5]uint32{0xf0000000}, 1},
+		{"c0ffee", [5]uint32{0xc0ffee00}, [5]uint32{0xffffff00}, 1},
+		{"c0ffeebeef", [5]uint32{0xc0ffeebe, 0xef000000}, [5]uint32{0xffffffff, 0xff000000}, 2},
+	} {
+		words, mask, gotN := hashPrefixWords(tc.prefix)
+
+		if words != tc.wantWords {
+			t.Errorf("[%d] words = %08x, want %08x", n, words, tc.wantWords)
+		}
+
+		if mask != tc.wantMask {
+			t.Errorf("[%d] mask = %08x, want %08x", n, mask, tc.wantMask)
+		}
+
+		if gotN != tc.wantN {
+			t.Errorf("[%d] n = %d, want %d", n, gotN, tc.wantN)
+		}
+	}
+}
+
 func TestTrimHeader(t *testing.T) {
 	for n, tc := range []struct {
 		head   []byte

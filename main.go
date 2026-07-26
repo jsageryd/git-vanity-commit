@@ -173,6 +173,8 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 
 	var wg sync.WaitGroup
 
+	prefixWords, prefixMask, prefixLen := hashPrefixWords(hashPrefix)
+
 	work := func(offset, stepSize int) {
 		defer wg.Done()
 
@@ -186,24 +188,12 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 		headerBytes := []byte("\n" + header + " ")
 		nullByte := []byte{0x00}
 
-		hashMask := byte(0xff)
-		var suffix string
-
-		if len(hashPrefix)%2 != 0 {
-			hashMask = 0xf0
-			suffix = "0"
-		}
-
-		hashPrefixBytes, _ := hex.DecodeString(hashPrefix + suffix)
-
 		var nBytes []byte
 		var commitSizeBytes []byte
 
 		var lastSum [5]uint32
 
 		var nBytesTailAndPadding []byte
-
-		var sum [sha1.Size]byte
 
 		for n := offset; n >= 0; n += stepSize {
 			if !addToDigits(nBytes, stepSize) {
@@ -230,20 +220,18 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 			hashState.h = lastSum
 			h.Write(nBytesTailAndPadding)
 
-			for i, w := range hashState.h {
-				binary.BigEndian.PutUint32(sum[i*4:], w)
-			}
+			if hashState.h[0]&prefixMask[0] == prefixWords[0] && match(&hashState.h, &prefixWords, &prefixMask, prefixLen) {
+				var sum [sha1.Size]byte
+				for i, w := range hashState.h {
+					binary.BigEndian.PutUint32(sum[i*4:], w)
+				}
 
-			candidate := sum[:]
-
-			if bytes.HasPrefix(candidate, hashPrefixBytes[:len(hashPrefixBytes)-1]) &&
-				candidate[len(hashPrefixBytes)-1]&hashMask == hashPrefixBytes[len(hashPrefixBytes)-1]&hashMask {
 				buf := new(bytes.Buffer)
 				buf.Write(head)
 				buf.Write(headerBytes)
 				buf.Write(nBytes)
 				buf.Write(tail)
-				found <- res{hex.EncodeToString(candidate), n, buf.Bytes()}
+				found <- res{hex.EncodeToString(sum[:]), n, buf.Bytes()}
 				return
 			}
 
@@ -307,6 +295,38 @@ func sha1State(h hash.Hash) *sha1Digest {
 	}
 
 	return (*sha1Digest)((*eface)(unsafe.Pointer(&h)).data)
+}
+
+// hashPrefixWords returns the desired hash prefix as big-endian words, the
+// mask selecting the significant bits of each, and the number of words used.
+func hashPrefixWords(hashPrefix string) (words, mask [5]uint32, n int) {
+	padded, _ := hex.DecodeString(hashPrefix + strings.Repeat("0", sha1.Size*2-len(hashPrefix)))
+
+	bits := 4 * len(hashPrefix)
+
+	for i := range words {
+		words[i] = binary.BigEndian.Uint32(padded[i*4:])
+
+		if b := bits - 32*i; b > 0 {
+			if b > 32 {
+				b = 32
+			}
+			mask[i] = ^uint32(0) << (32 - b)
+			words[i] &= mask[i]
+			n = i + 1
+		}
+	}
+
+	return words, mask, n
+}
+
+func match(sum, words, mask *[5]uint32, n int) bool {
+	for i := range n {
+		if sum[i]&mask[i] != words[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // addToDigits adds step to the decimal digits in place. It reports whether the
