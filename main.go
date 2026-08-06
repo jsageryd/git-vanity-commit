@@ -10,6 +10,7 @@ import (
 	"hash"
 	"io"
 	"log"
+	"math"
 	"os"
 	"os/exec"
 	"regexp"
@@ -17,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 )
@@ -177,6 +179,8 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 
 	prefixWords, prefixMask, prefixLen := hashPrefixWords(hashPrefix)
 
+	var totalCount atomic.Int64
+
 	work := func(offset, stepSize int) {
 		defer wg.Done()
 
@@ -242,6 +246,7 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 			count++
 
 			if count >= pollInterval {
+				totalCount.Add(int64(count))
 				count = 0
 
 				select {
@@ -275,6 +280,40 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 	go func() {
 		wg.Wait()
 		close(found)
+	}()
+
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+
+		startTotal := totalCount.Load()
+		start := time.Now()
+
+		select {
+		case <-done:
+			return
+		case <-time.After(100 * time.Millisecond):
+		}
+
+		total := totalCount.Load() - startTotal
+		duration := time.Since(start)
+
+		if total == 0 {
+			return
+		}
+
+		p10, p50, p90 := estimate(float64(total)/duration.Seconds(), len(hashPrefix))
+
+		const year = 60 * 60 * 24 * 365 // seconds
+
+		if p90 > 500_000_000*year {
+			log.Println("Estimated search time is many millions of years")
+			return
+		}
+
+		log.Printf(
+			"Estimated search time <%s (10%%), <%s (50%%), <%s (90%%)",
+			roundUpHuman(p10), roundUpHuman(p50), roundUpHuman(p90),
+		)
 	}()
 
 	minRes, ok := <-found
@@ -428,6 +467,71 @@ func resetTo(hash string) {
 		} else {
 			log.Fatalf("error resettting to commit: %v", err)
 		}
+	}
+}
+
+// estimate returns percentile estimates of the time in seconds to find a match.
+func estimate(hashesPerSecond float64, prefixLength int) (p10, p50, p90 float64) {
+	if hashesPerSecond <= 0 {
+		return 0, 0, 0
+	}
+
+	// prefixSpace is the total number of possible prefixes at the given length
+	prefixSpace := math.Pow(16, float64(prefixLength))
+
+	quantile := func(q float64) (seconds float64) {
+		// p is the probability of finding one match
+		p := 1 / prefixSpace
+
+		// k is the number of attempts needed to find one match at probability q
+		//
+		// math.Log1p(-p) is the same as math.Log(1-p) but accurate for small
+		// values. It prevents 1-p from collapsing to 1.0 for longer hash prefixes,
+		// which would cause math.Log(1-p) to return 0 and k to be infinite, in turn
+		// resulting in mangled estimates.
+		k := math.Log(1-q) / math.Log1p(-p)
+
+		// t is the number of seconds needed to run k attempts
+		t := k / hashesPerSecond
+
+		return t
+	}
+
+	return quantile(0.1), quantile(0.5), quantile(0.9)
+}
+
+func roundUpHuman(seconds float64) string {
+	const (
+		minute = 60
+		hour   = 60 * minute
+		day    = 24 * hour
+		year   = 365 * day
+	)
+
+	switch {
+	case seconds < 30:
+		// round up to 1-second intervals
+		return fmt.Sprintf("%ds", int(math.Ceil(seconds)))
+	case seconds < 1*minute:
+		// round up to 5-second intervals
+		return fmt.Sprintf("%ds", int(math.Ceil(seconds/5)*5))
+	case seconds < 15*minute:
+		// round up to 1-minute intervals
+		return fmt.Sprintf("%dm", int(math.Ceil(seconds/minute)))
+	case seconds < 1*hour:
+		// round up to 5-minute intervals
+		return fmt.Sprintf("%dm", int(math.Ceil(seconds/(5*minute))*5))
+	case seconds < 1*day:
+		// round up to 1-hour intervals
+		return fmt.Sprintf("%dh", int(math.Ceil(seconds/hour)))
+	case seconds < 1*year:
+		// round up to 1-day intervals
+		return fmt.Sprintf("%dd", int(math.Ceil(seconds/day)))
+	case seconds < 1_000_000_000*year:
+		// round up to 1-year intervals
+		return fmt.Sprintf("%sy", thousandSeparate(int(math.Ceil(seconds/year))))
+	default:
+		return "eons"
 	}
 }
 
