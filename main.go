@@ -197,7 +197,9 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 
 		var nBytesTailAndPadding []byte
 
-		for n, poll := offset, 0; n >= 0; n += stepSize {
+		var count int
+
+		for n := offset; n >= 0; n += stepSize {
 			if !addToDigits(nBytes, stepSize) {
 				nBytes = strconv.AppendInt(nBytes[:0], int64(n), 10)
 				commitSize := len(head) + len(tail) + len(header) + 1 + len(nBytes) + 1
@@ -237,8 +239,10 @@ func find(hashPrefix, header string, startN int, commit []byte) (hash string, it
 				return
 			}
 
-			if poll++; poll == pollInterval {
-				poll = 0
+			count++
+
+			if count >= pollInterval {
+				count = 0
 
 				select {
 				case <-done:
